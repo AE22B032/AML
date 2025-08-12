@@ -72,11 +72,16 @@ class TransactionDataset(Dataset):
         return self.features[idx], self.labels[idx]
 
 
-def load_and_preprocess_data(filepath: str):
+def load_and_preprocess_data(filepath: str, sample_frac: float = 0.01):  # Sample only 1% of data
     """Loads CSV, drops IDs, fits preprocessing pipeline, and returns df + fitted preprocessor."""
     # Ensure the data exists, auto-downloading if needed
     csv_path = ensure_dataset_present(filepath)
     df = pd.read_csv(csv_path)
+    
+    # AGGRESSIVE SAMPLING to reduce memory usage
+    if len(df) > 10000:  # Only sample if dataset is large
+        df = df.sample(frac=sample_frac, random_state=42).reset_index(drop=True)
+        print(f"Sampled dataset to {len(df)} rows ({sample_frac*100:.1f}% of original)")
 
     # Drop non-informative columns if present
     for col in ["nameOrig", "nameDest"]:
@@ -185,8 +190,8 @@ def prepare_federated_data(
         else:
             train_dataset, val_dataset = dataset, torch.utils.data.Subset(dataset, [])
 
-        train_loader = DataLoader(train_dataset, batch_size=batch_size or max(1, n), shuffle=True)
-        val_loader = DataLoader(val_dataset, batch_size=batch_size or max(1, n))
+        train_loader = DataLoader(train_dataset, batch_size=batch_size or max(1, n), shuffle=True, num_workers=0, pin_memory=False)
+        val_loader = DataLoader(val_dataset, batch_size=batch_size or max(1, n), num_workers=0, pin_memory=False)
         client_loaders.append((train_loader, val_loader))
 
     return client_loaders
@@ -222,8 +227,8 @@ def prepare_two_client_data(df: pd.DataFrame, preprocessor: ColumnTransformer, b
             train_dataset, val_dataset = dataset, torch.utils.data.Subset(dataset, [])
         client_loaders.append(
             (
-                DataLoader(train_dataset, batch_size=batch_size or max(1, n), shuffle=True),
-                DataLoader(val_dataset, batch_size=batch_size or max(1, n)),
+                DataLoader(train_dataset, batch_size=batch_size or max(1, n), shuffle=True, num_workers=0, pin_memory=False),
+                DataLoader(val_dataset, batch_size=batch_size or max(1, n), num_workers=0, pin_memory=False),
             )
         )
     return client_loaders
@@ -242,4 +247,4 @@ def build_test_loader(df_test: pd.DataFrame, preprocessor: ColumnTransformer, ba
     y = df_test["isFraud"].to_numpy(dtype=np.float32)
     X_t = preprocessor.transform(X)
     dataset = TransactionDataset(X_t, y)
-    return DataLoader(dataset, batch_size=batch_size or max(1, len(dataset)))
+    return DataLoader(dataset, batch_size=batch_size or max(1, len(dataset)), num_workers=0, pin_memory=False)
