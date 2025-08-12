@@ -215,7 +215,7 @@ try:
 
         # Minimal cfg from run_config
         cfg = {"local_epochs": local_epochs}
-        return FlowerClient(model, train_loader, val_loader, cfg)
+        return FlowerClient(model, train_loader, val_loader, cfg).to_client()
 
     app = ClientApp(client_fn=client_fn)  # noqa: F401
 except Exception:  # pragma: no cover
