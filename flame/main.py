@@ -1,5 +1,6 @@
 # main.py
 
+import os
 import flwr as fl
 import torch
 from functools import partial
@@ -18,7 +19,7 @@ from flame.server_app import weighted_average, fit_config, make_server_evaluate_
 from flame.logging_utils import CombinedLogger
 
 NUM_CLIENTS = 2
-BATCH_SIZE = 256
+BATCH_SIZE = 64  # Reduced from 256
 DATA_PATH = "data/PS_20174392719_1491204439457_log.csv"
 INPUT_DIM = 20
 LOG_DIR = Path("runs")
@@ -49,12 +50,12 @@ def _calc_input_dim(preprocessor, sample_df):
         return num
 
 
-def client_fn(cid: str, dataloaders) -> FlowerClient:
+def client_fn(cid: str, dataloaders):
     """Create a Flower client instance for a given client ID."""
     cfg = CLIENT_CFGS[int(cid)] if int(cid) < len(CLIENT_CFGS) else {}
     model = MLP(input_dim=INPUT_DIM).to(torch.device("cpu"))
     train_loader, val_loader = dataloaders[int(cid)]
-    return FlowerClient(model, train_loader, val_loader, cfg)
+    return FlowerClient(model, train_loader, val_loader, cfg).to_client()
 
 
 class LoggingFedAvg(fl.server.strategy.FedAvg):
@@ -76,9 +77,14 @@ class LoggingFedAvg(fl.server.strategy.FedAvg):
 def main():
     """Load data, start Flower simulation."""
     global INPUT_DIM
+    
+    # Memory management settings
+    torch.set_num_threads(1)
+    os.environ["OMP_NUM_THREADS"] = "1"
+    os.environ["MKL_NUM_THREADS"] = "1"
 
-    # Load and preprocess data
-    df, preprocessor = load_and_preprocess_data(DATA_PATH)
+    # Load and preprocess data with heavy sampling to reduce memory
+    df, preprocessor = load_and_preprocess_data(DATA_PATH, sample_frac=0.005)  # Use only 0.5% of data
     df_train, df_test = train_test_split_df(df, test_frac=0.2)
 
     # Determine input dimension after preprocessing
@@ -107,11 +113,11 @@ def main():
     # Define strategy
     strategy = LoggingFedAvg(
         logger=logger,
-        fraction_fit=1.0,  # Train on 100% of clients per round
-        fraction_evaluate=1.0,  # Evaluate on 100% of clients per round
-        min_fit_clients=NUM_CLIENTS,
-        min_evaluate_clients=NUM_CLIENTS,
-        min_available_clients=NUM_CLIENTS,
+        fraction_fit=0.5,  # Train on 50% of clients per round (reduced from 100%)
+        fraction_evaluate=0.5,  # Evaluate on 50% of clients per round (reduced from 100%)
+        min_fit_clients=1,  # Reduced from NUM_CLIENTS
+        min_evaluate_clients=1,  # Reduced from NUM_CLIENTS
+        min_available_clients=1,  # Reduced from NUM_CLIENTS
         evaluate_metrics_aggregation_fn=weighted_average,
         on_fit_config_fn=fit_config,  # Configure clients for training
         evaluate_fn=eval_and_log,  # Server-side evaluation function
@@ -121,9 +127,10 @@ def main():
     fl.simulation.start_simulation(
         client_fn=client_fn_with_data,
         num_clients=NUM_CLIENTS,
-        config=fl.server.ServerConfig(num_rounds=3),
+        config=fl.server.ServerConfig(num_rounds=2),  # Reduced from 3
         strategy=strategy,
-        client_resources={"num_cpus": 2},  # Allocate resources for each client
+        client_resources={"num_cpus": 1},  # Reduced from 2
+        ray_init_args={"num_cpus": 2, "object_store_memory": 200000000},  # 200MB object store
     )
 
     print("Simulation finished.")
