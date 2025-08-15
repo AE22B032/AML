@@ -1,14 +1,15 @@
-# Python virtual environments
-.venv/
-env/
-venv/
-
-# Byte-compiled / optimized / DLL files
+# Python bytecode and caches
 __pycache__/
 *.py[cod]
 *$py.class
 
-# Distribution / packaging
+# Virtual environments
+venv/
+.venv/
+ENV/
+env/
+
+# Package/build artifacts
 build/
 develop-eggs/
 dist/
@@ -25,30 +26,64 @@ share/python-wheels/
 *.egg-info/
 .installed.cfg
 *.egg
+pip-wheel-metadata/
 
-# Unit test / coverage reports
-htmlcov/
+# Test/coverage/mypy caches
+.pytest_cache/
 .tox/
 .nox/
-.coverage
-.coverage.*
-.cache
-nosetests.xml
+.coverage*
+htmlcov/
+.mypy_cache/
+.ruff_cache/
+.hypothesis/
 coverage.xml
 *.cover
 *.py,cover
-.hypothesis/
+nosetests.xml
+.cache/
+*.cache
 
-# Jupyter Notebook checkpoints
-.ipynb_checkpoints
-
-# PyCharm / VS Code settings
-.idea/
-.vscode/
-
-# Logs
+# Logs and runtime
+logs/
 *.log
+.ray/
+ray_results/
 
-# macOS / Linux system files
+# IDE/editor
+.vscode/
+.idea/
+*.swp
+
+# OS files
 .DS_Store
 Thumbs.db
+
+# Environment/config
+.env
+.env.*
+.kaggle/
+kaggle.json
+.python-version
+
+# Notebooks
+.ipynb_checkpoints/
+
+# Flower/experiments
+runs/
+flame/runs/
+
+# Data (keep directory, ignore large files)
+flame/data/*.csv
+flame/data/*.csv.gz
+flame/data/*.parquet
+!flame/data/.gitkeep
+
+# Top-level data directory (keep folder, ignore large files)
+data/*.csv
+data/*.csv.gz
+data/*.parquet
+!data/.gitkeep
+
+# Local history (VS Code)
+.history/
