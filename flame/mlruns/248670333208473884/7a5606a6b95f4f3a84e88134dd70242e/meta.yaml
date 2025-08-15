@@ -1,0 +1,14 @@
+artifact_uri: file:///home/poweranger/flame-project/flame/mlruns/248670333208473884/7a5606a6b95f4f3a84e88134dd70242e/artifacts
+end_time: 1755115755124
+entry_point_name: ''
+experiment_id: '248670333208473884'
+lifecycle_stage: active
+run_id: 7a5606a6b95f4f3a84e88134dd70242e
+run_name: rebellious-finch-787
+source_name: ''
+source_type: 4
+source_version: ''
+start_time: 1755115747696
+status: 3
+tags: []
+user_id: poweranger

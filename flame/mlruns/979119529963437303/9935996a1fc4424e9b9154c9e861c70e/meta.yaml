@@ -1,0 +1,14 @@
+artifact_uri: file:///home/poweranger/flame-project/flame/mlruns/979119529963437303/9935996a1fc4424e9b9154c9e861c70e/artifacts
+end_time: 1755115648953
+entry_point_name: ''
+experiment_id: '979119529963437303'
+lifecycle_stage: active
+run_id: 9935996a1fc4424e9b9154c9e861c70e
+run_name: aged-loon-592
+source_name: ''
+source_type: 4
+source_version: ''
+start_time: 1755115648940
+status: 3
+tags: []
+user_id: poweranger

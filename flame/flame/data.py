@@ -72,16 +72,16 @@ class TransactionDataset(Dataset):
         return self.features[idx], self.labels[idx]
 
 
-def load_and_preprocess_data(filepath: str, sample_frac: float = 0.01):  # Sample only 1% of data
+def load_and_preprocess_data(filepath: str, sample_frac: float = 0.001):  # Default to 0.1% sample
     """Loads CSV, drops IDs, fits preprocessing pipeline, and returns df + fitted preprocessor."""
     # Ensure the data exists, auto-downloading if needed
     csv_path = ensure_dataset_present(filepath)
-    df = pd.read_csv(csv_path)
     
-    # AGGRESSIVE SAMPLING to reduce memory usage
-    if len(df) > 10000:  # Only sample if dataset is large
-        df = df.sample(frac=sample_frac, random_state=42).reset_index(drop=True)
-        print(f"Sampled dataset to {len(df)} rows ({sample_frac*100:.1f}% of original)")
+    # ULTRA AGGRESSIVE SAMPLING to reduce memory usage
+    df = pd.read_csv(csv_path, nrows=1000)  # Load max 1000 rows initially
+    if len(df) > 500:  # Further sample if still too large
+        df = df.sample(n=min(500, len(df)), random_state=42).reset_index(drop=True)
+        print(f"Ultra-sampled dataset to {len(df)} rows for memory efficiency")
 
     # Drop non-informative columns if present
     for col in ["nameOrig", "nameDest"]:

@@ -1,6 +1,7 @@
 # main.py
 
 import os
+import gc
 import flwr as fl
 import torch
 from functools import partial
@@ -19,15 +20,15 @@ from flame.server_app import weighted_average, fit_config, make_server_evaluate_
 from flame.logging_utils import CombinedLogger
 
 NUM_CLIENTS = 2
-BATCH_SIZE = 64  # Reduced from 256
+BATCH_SIZE = 16  # Reduced from 64 to 16
 DATA_PATH = "data/PS_20174392719_1491204439457_log.csv"
 INPUT_DIM = 20
 LOG_DIR = Path("runs")
 
 # Experiment toggles
 CLIENT_CFGS = [
-    {"local_epochs": 2, "dp": {"noise_multiplier": 0.0, "max_grad_norm": 1.0}, "quant_bits": 0, "sparsity": 0.0},
-    {"local_epochs": 2, "dp": {"noise_multiplier": 0.0, "max_grad_norm": 1.0}, "quant_bits": 0, "sparsity": 0.0},
+    {"local_epochs": 1, "dp": {"noise_multiplier": 0.0, "max_grad_norm": 1.0}, "quant_bits": 0, "sparsity": 0.0},  # Reduced from 2 to 1
+    {"local_epochs": 1, "dp": {"noise_multiplier": 0.0, "max_grad_norm": 1.0}, "quant_bits": 0, "sparsity": 0.0},  # Reduced from 2 to 1
 ]
 
 
@@ -78,13 +79,16 @@ def main():
     """Load data, start Flower simulation."""
     global INPUT_DIM
     
-    # Memory management settings
+    # Aggressive memory management settings
     torch.set_num_threads(1)
     os.environ["OMP_NUM_THREADS"] = "1"
     os.environ["MKL_NUM_THREADS"] = "1"
+    
+    # Force garbage collection
+    gc.collect()
 
-    # Load and preprocess data with heavy sampling to reduce memory
-    df, preprocessor = load_and_preprocess_data(DATA_PATH, sample_frac=0.005)  # Use only 0.5% of data
+    # Load and preprocess data with extreme sampling to reduce memory
+    df, preprocessor = load_and_preprocess_data(DATA_PATH, sample_frac=0.001)  # Use only 0.1% of data
     df_train, df_test = train_test_split_df(df, test_frac=0.2)
 
     # Determine input dimension after preprocessing
@@ -102,7 +106,17 @@ def main():
     model_for_eval = MLP(input_dim=INPUT_DIM)
     server_eval_fn = make_server_evaluate_fn(model_for_eval, test_loader)
 
-    logger = CombinedLogger(LOG_DIR)
+    logger = CombinedLogger(LOG_DIR, experiment_name="flame_minimal_memory")
+    
+    # Log minimal hyperparameters to reduce overhead
+    hyperparams = {
+        "num_clients": NUM_CLIENTS,
+        "batch_size": BATCH_SIZE,
+        "sample_fraction": 0.001,
+        "num_rounds": 1,
+    }
+    # Comment out MLflow logging to save memory
+    # logger.log_params(hyperparams)
 
     # Wrap evaluate_fn to also log to CSV/TensorBoard
     def eval_and_log(server_round: int, parameters, config):
@@ -124,16 +138,29 @@ def main():
     )
 
     # Start simulation
-    fl.simulation.start_simulation(
-        client_fn=client_fn_with_data,
-        num_clients=NUM_CLIENTS,
-        config=fl.server.ServerConfig(num_rounds=2),  # Reduced from 3
-        strategy=strategy,
-        client_resources={"num_cpus": 1},  # Reduced from 2
-        ray_init_args={"num_cpus": 2, "object_store_memory": 200000000},  # 200MB object store
-    )
+    try:
+        fl.simulation.start_simulation(
+            client_fn=client_fn_with_data,
+            num_clients=NUM_CLIENTS,
+            config=fl.server.ServerConfig(num_rounds=1),  # Reduced to 1 round only
+            strategy=strategy,
+            client_resources={"num_cpus": 0.5},  # Reduced from 1 to 0.5
+            ray_init_args={"num_cpus": 1, "object_store_memory": 100000000},  # 100MB object store (reduced from 200MB)
+        )
+        
+        # Comment out model logging to save memory
+        # final_model = MLP(input_dim=INPUT_DIM)
+        # logger.log_model(final_model, "final_federated_model")
+        
+        # Force cleanup
+        gc.collect()
+        
+    finally:
+        # Always end the MLflow run
+        logger.end_run()
+        gc.collect()
 
-    print("Simulation finished.")
+    print("Simulation finished with minimal memory usage.")
 
 
 if __name__ == "__main__":

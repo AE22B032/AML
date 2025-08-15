@@ -1,11 +1,17 @@
 # src/client.py
 
+import os
 import flwr as fl
 import torch
 from sklearn.metrics import precision_score, recall_score, f1_score, roc_auc_score, accuracy_score
 import numpy as np
 from typing import Optional, Dict, Any
 from copy import deepcopy
+
+# Force minimal threads for memory efficiency
+torch.set_num_threads(1)
+os.environ["OMP_NUM_THREADS"] = "1"
+os.environ["MKL_NUM_THREADS"] = "1"
 
 from flame.task import get_parameters, set_parameters, MLP
 from flame.utils import quantize_dequantize, sparsify, add_gaussian_noise
@@ -15,7 +21,7 @@ from flame.data import (
     train_test_split_df,
 )
 
-DEVICE = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+DEVICE = torch.device("cpu")  # Force CPU to save memory
 
 
 def _maybe_wrap_dp(model: torch.nn.Module, loader, max_grad_norm: float, noise_multiplier: float):
