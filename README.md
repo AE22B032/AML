@@ -115,6 +115,55 @@ You can disable MLflow in `main.py` for ultra-low memory runs.
 - Deprecation (NumPyClient vs Client): code returns `FlowerClient(...).to_client()` to satisfy current Flower API.
 - Missing dataset: place the PaySim CSV under `flame/data/` as noted above.
 
+## How it works
+
+Federated learning proceeds in synchronous rounds coordinated by the server:
+1. Server initializes or updates the global model (FedAvg).
+2. A subset of clients is selected (configurable via `fraction_fit`).
+3. Each selected client trains locally for `local_epochs` on its partition and reports updated weights and metrics.
+4. Server aggregates client updates (weighted by local sample count) and logs aggregated metrics.
+5. Optionally, the server evaluates the updated global model on a central test set and logs results.
+
+## Data pipeline
+- Loader: reads PaySim CSV and applies aggressive sampling for low-RAM runs (<=1000 rows read, subsampled to ~500).
+- Preprocessing: scikit-learn `ColumnTransformer` with `StandardScaler` for numerics and `OneHotEncoder` for categoricals.
+- Splits: deterministic train/val per client (two partitions) and a global test split for server-side evaluation.
+- DataLoaders: small batches, single-threaded (`num_workers=0`) to minimize memory.
+
+## Model
+- Simple MLP (PyTorch) for tabular fraud detection.
+- Hidden layers with dropout; sigmoid output for binary classification.
+- Parameter helpers convert between NumPy and PyTorch to interoperate with Flower.
+
+## Metrics and aggregation
+- Per client: loss, ROC-AUC, precision, recall, F1, accuracy.
+- Server aggregates client metrics using weighted average by sample count.
+- Server-side evaluation computes the same metrics on the global test set each round.
+
+## Configuration knobs
+- In `flame/pyproject.toml` (Flower runtime):
+	- `num-server-rounds`, `fraction-fit`, `local-epochs`.
+- In `flame/main.py` (simulation):
+	- Number of clients, batch size, sampling fraction, local epochs, Ray resource limits.
+	- Privacy/efficiency toggles per client (DP-SGD, quantization, sparsification, Gaussian noise, adversarial simulation).
+
+## Scaling up (performance tips)
+- Increase sampling fraction and batch size gradually; raise `num_rounds` once stable.
+- Allow more Ray CPUs and object store memory if resources permit.
+- Disable MLflow when memory-constrained; rely on CSV/TensorBoard only.
+- Consider feature pruning or using sparse encodings to reduce memory footprint.
+
+## Roadmap
+- Add centralized baseline training for comparison.
+- Expose more run-time knobs via `pyproject.toml` for deployment.
+- Robust aggregation (e.g., median, Krum) and anomaly detection for adversarial clients.
+- Extended heterogeneity scenarios (feature/label skew) and personalization.
+
+## References
+- Flower: https://flower.ai
+- PyTorch: https://pytorch.org
+- PaySim dataset: https://www.kaggle.com/datasets/ealaxi/paysim1
+
 ## License
 
 This project is licensed under the MIT License. See the `LICENSE` file for details.
